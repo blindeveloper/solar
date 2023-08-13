@@ -94,20 +94,58 @@ def add_new_system(systemItem: SystemProductList):
 @app.post('/order')
 def make_new_order(orderItem: Order):
     try:
-        if len(orderItem.products) and is_valid_products(orderItem.products, cur):
+        if is_valid_products(orderItem.products, cur) and is_valid_systems(orderItem.systems, cur):
+            order_id = get_current_ms_time()
             for product in orderItem.products:
-                addProductToOrder(product)
-        if len(orderItem.systems) and is_valid_systems(orderItem.systems, cur):
+                addProductToOrder(product, order_id)
+                operateProductOrder(product)
             for system in orderItem.systems:
-                addSystemToOrder(system)
+                addSystemToOrder(system, order_id)
+                operateSystemOrder(system)
+        else:
+            return HTTPException(
+                status_code=500, detail='Order is not valid. Check IDs of products and systems.')
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. make_new_order')
 
 
-def addProductToOrder(product):
-    print('addProductToOrder===>>>>: ', product)
+def operateProductOrder(product):
+    cur.execute(f"""
+        UPDATE Product
+        SET amount = amount - {product.amount}
+        WHERE id = {product.id};
+    """)
+    con.commit()
 
 
-def addSystemToOrder(system):
-    print('addProductToOrder===>>>>: ', system)
+def operateSystemOrder(system):
+    cur.execute(f"""
+            SELECT * FROM System 
+            INNER JOIN Product ON Product.id = System.product_id
+            WHERE system_id = {system.id};
+        """)
+    res = cur.fetchone()
+
+    cur.execute(f"""
+        UPDATE Product
+        SET amount = amount - {res[3] * system.amount}
+        WHERE id = {res[2]};
+    """)
+    con.commit()
+
+
+def addProductToOrder(product, order_id):
+    cur.execute(f"""
+            INSERT INTO CustomerOrder (order_id, product_id, product_amount)
+            VALUES(%s,%s,%s);
+        """, (order_id, product.id, product.amount))
+    con.commit()
+
+
+def addSystemToOrder(system, order_id):
+    cur.execute(f"""
+            INSERT INTO CustomerOrder (order_id, system_id, system_amount)
+            VALUES(%s,%s,%s);
+        """, (order_id, system.id, system.amount))
+    con.commit()

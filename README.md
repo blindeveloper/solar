@@ -4,10 +4,11 @@
 2. run `docker-compose up`
 3. go to `http://0.0.0.0:8000/docs` to test API
 
-- create order model
+- check availability amount on order validation
+  **DONE**
 - handle new order with system
 - handle new product with random set of products
-  DONE
+- create order model
 - update product with new stock
 - create system model
 - add product

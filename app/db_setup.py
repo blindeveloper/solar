@@ -22,12 +22,11 @@ def build_tables(cur):
     cur.execute(
         """CREATE TABLE IF NOT EXISTS CustomerOrder(
           id SERIAL PRIMARY KEY NOT NULL,
+          order_id BIGINT NOT NULL,
           product_id INT,
-          system_id INT,
+          system_id BIGINT,
           system_amount INT,
-          product_amount INT,
-          FOREIGN KEY (product_id) REFERENCES Product (id),
-          FOREIGN KEY (system_id) REFERENCES System (id));
+          product_amount INT);
         """)
 
 
