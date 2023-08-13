@@ -102,6 +102,8 @@ def make_new_order(orderItem: Order):
             for system in orderItem.systems:
                 addSystemToOrder(system, order_id)
                 operateSystemOrder(system)
+            return HTTPException(
+                status_code=200, detail='Order is successfully added and handled.')
         else:
             return HTTPException(
                 status_code=500, detail='Order is not valid. Check IDs of products and systems.')
