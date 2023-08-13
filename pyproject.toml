@@ -1,0 +1,19 @@
+[project]
+name = "energy_provider_api"
+description = "Energy provider API"
+readme = "README.md"
+requires-python = ">=3.10"
+dynamic = ["version"]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "psycopg2"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest"
+]
+
+[tool.setuptools]
+packages = ["app"]
