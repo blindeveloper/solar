@@ -1,7 +1,4 @@
 import time
-import psycopg2
-from fastapi import HTTPException
-from datetime import datetime, timedelta
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 
@@ -46,21 +43,31 @@ def getProductsJson(response):
 
 def is_valid_products(product_list, cur):
     is_valid = True
+    list_of_ids = []
     if len(product_list):
         for product in product_list:
-            cur.execute(f"SELECT * FROM Product WHERE id = {product.id};")
-            rs = cur.fetchone()
-            if not rs:
-                is_valid = False
+            list_of_ids.append(product.id)
+
+        cur.execute(
+            f"SELECT * FROM Product WHERE id = ANY(ARRAY{list_of_ids});")
+
+        rs = cur.fetchall()
+        if len(rs) != len(product_list):
+            is_valid = False
     return is_valid
 
 
 def is_valid_systems(system_list, cur):
     is_valid = True
+    list_of_ids = []
+
     if len(system_list):
         for system in system_list:
-            cur.execute(f"SELECT * FROM System WHERE system_id = {system.id};")
-            rs = cur.fetchone()
-            if not rs:
-                is_valid = False
+            list_of_ids.append(system.id)
+
+        cur.execute(
+            f"SELECT * FROM System WHERE system_id = ANY(ARRAY{list_of_ids});")
+        rs = cur.fetchall()
+        if len(rs) != len(system_list):
+            is_valid = False
     return is_valid
