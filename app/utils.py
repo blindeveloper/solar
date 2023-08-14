@@ -35,8 +35,7 @@ def getProductsJson(response):
     list = {}
     for product in response:
         list[product[0]] = {
-            'name': product[1],
-            'amount': product[2]
+            'name': product[1]
         }
     return list
 
@@ -59,15 +58,19 @@ def is_valid_products(product_list, cur):
 
 def is_valid_systems(system_list, cur):
     is_valid = True
-    list_of_ids = []
+    requested_list_of_ids = []
+    valid_list_of_ids = []
 
     if len(system_list):
         for system in system_list:
-            list_of_ids.append(system.id)
-
+            requested_list_of_ids.append(system.id)
         cur.execute(
-            f"SELECT * FROM System WHERE system_id = ANY(ARRAY{list_of_ids});")
+            f"SELECT system_id FROM System WHERE system_id = ANY(ARRAY{requested_list_of_ids});")
         rs = cur.fetchall()
-        if len(rs) != len(system_list):
-            is_valid = False
+        for id in rs:
+            valid_list_of_ids.append(id[0])
+
+        for system_id in requested_list_of_ids:
+            if system_id not in valid_list_of_ids:
+                is_valid = False
     return is_valid

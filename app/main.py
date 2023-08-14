@@ -119,19 +119,75 @@ def add_new_system(systemItem: SystemProductList):
             status_code=500, detail='Internal server error. add_new_system')
 
 
+def get_systems_by_id(system_id):
+    cur.execute(f"""
+                SELECT * FROM System 
+                INNER JOIN Product ON Product.id = System.product_id
+                WHERE system_id = {system_id};
+            """)
+    return cur.fetchall()
+
+
+def get_product_stock(map):
+    product_id_list = []
+    for key, value in map.items():
+        product_id_list.append(key)
+    cur.execute(f"""
+                SELECT * FROM Stock 
+                WHERE product_id = ANY(ARRAY{product_id_list});
+            """)
+    return cur.fetchall()
+
+
+def get_order_map(orderItem):
+    map = {}
+
+    for system in orderItem.systems:
+        sys_res = get_systems_by_id(system.id)
+        for sys in sys_res:
+            if sys[2] not in map:
+                map[sys[2]] = sys[3] * system.amount
+            else:
+                map[sys[2]] = (map[sys[2]] + sys[3]) * system.amount
+
+    for prod in orderItem.products:
+        if prod.id not in map:
+            map[prod.id] = prod.amount
+        else:
+            map[prod.id] = map[prod.id] + prod.amount
+
+    return map
+
+
+def is_valid_products_amounts_requested(orderItem):
+    is_valid = True
+    order_map = get_order_map(orderItem)
+    product_stock = get_product_stock(order_map)
+    for stock_item in product_stock:
+        prod_id = stock_item[1]
+        prod_remaining_amount = stock_item[2]
+        if order_map[prod_id] > prod_remaining_amount:
+            is_valid = False
+    return is_valid
+
+
 @app.post('/order')
 def make_new_order(orderItem: Order):
     try:
         if is_valid_products(orderItem.products, cur) and is_valid_systems(orderItem.systems, cur):
-            order_id = get_current_ms_time()
-            for product in orderItem.products:
-                addProductToOrder(product, order_id)
-                operateProductOrder(product)
-            for system in orderItem.systems:
-                addSystemToOrder(system, order_id)
-                operateSystemOrder(system)
-            return HTTPException(
-                status_code=200, detail='Order is successfully added and handled.')
+            if is_valid_products_amounts_requested(orderItem):
+                order_id = get_current_ms_time()
+                for product in orderItem.products:
+                    addProductToOrder(product, order_id)
+                    operateProductOrder(product)
+                for system in orderItem.systems:
+                    addSystemToOrder(system, order_id)
+                    operateSystemOrder(system)
+                return HTTPException(
+                    status_code=200, detail='Order is successfully added and handled.')
+            else:
+                return HTTPException(
+                    status_code=500, detail='Order is not valid. To many products requested.')
         else:
             return HTTPException(
                 status_code=500, detail='Order is not valid. Check IDs of products and systems.')
