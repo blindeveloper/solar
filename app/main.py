@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
-from app.entities import Product, ProductStockUpdate, SystemProductList, Order
+from app.entities import Product, ProductStockUpdate, SystemProductList, Order, Email
 from app.db_setup import build_tables, get_db_connection
-from app.utils import get_current_ms_time, getSystemsJson, getProductsJson, is_valid_products, is_valid_systems, getStockJson
+from app.utils import get_current_ms_time, get_systems_json, get_products_json, is_valid_products, is_valid_systems, get_stock_json
+from app.order_service import operate_product_order, operate_system_order, add_product_to_order, add_system_to_order, handle_stock_status_notification
+
 
 con = get_db_connection()
 cur = con.cursor()
@@ -14,7 +16,7 @@ def get_all_products():
     try:
         cur.execute("SELECT * FROM Product;")
         result = cur.fetchall()
-        return getProductsJson(result)
+        return get_products_json(result)
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. get_all_products')
@@ -27,7 +29,7 @@ def get_stock_status():
             """SELECT * FROM Stock 
                 INNER JOIN Product ON Product.id = Stock.product_id;""")
         result = cur.fetchall()
-        return getStockJson(result)
+        return get_stock_json(result)
 
     except:
         raise HTTPException(
@@ -42,7 +44,7 @@ def get_all_systems():
                 INNER JOIN Product ON Product.id = System.product_id;
             """)
         response = cur.fetchall()
-        return getSystemsJson(response)
+        return get_systems_json(response)
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. get_all_systems')
@@ -53,7 +55,9 @@ def update_product_stock(product_id: str, product: ProductStockUpdate):
     try:
         cur.execute(f"""
                 UPDATE Stock
-                SET remaining_amount = {product.remaining_amount}, total_amount = {product.total_amount}
+                SET remaining_amount = {product.remaining_amount}, 
+                    total_amount = {product.total_amount},
+                    low_stock_reported = False
                 WHERE product_id = {product_id};
             """)
         con.commit()
@@ -80,13 +84,14 @@ def add_new_product(product: Product):
                 status_code=500, detail='Product with the same name is already in the database, you can find it in stock.')
         else:
             cur.execute(f"""INSERT INTO Product (name)
-                            VALUES(%s) RETURNING id;
-                        """, (product.name,))
+                                VALUES(%s) RETURNING id;
+                            """, (product.name,))
             created_product = cur.fetchone()
 
             cur.execute(
-                f"""INSERT INTO Stock (product_id, remaining_amount, total_amount) 
-                        VALUES(%s, %s, %s);""", (created_product[0], 0, 0))
+                f"""INSERT INTO Stock (product_id, remaining_amount, total_amount, low_stock_reported) 
+                            VALUES(%s, %s, %s, %s);""", (created_product[0], 0, 0, False))
+            con.commit()
             return HTTPException(
                 status_code=200, detail='New product successfully added')
     except:
@@ -117,6 +122,19 @@ def add_new_system(systemItem: SystemProductList):
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. add_new_system')
+
+
+@app.post('/email')
+def add_new_email(emailItem: Email):
+    try:
+        cur.execute('INSERT INTO Email (email) VALUES(%s);',
+                    (emailItem.email,))
+        con.commit()
+        return HTTPException(
+            status_code=200, detail='Email successfully added')
+    except:
+        raise HTTPException(
+            status_code=500, detail='Internal server error. Email already in DB.')
 
 
 def get_systems_by_id(system_id):
@@ -178,11 +196,12 @@ def make_new_order(orderItem: Order):
             if is_valid_products_amounts_requested(orderItem):
                 order_id = get_current_ms_time()
                 for product in orderItem.products:
-                    addProductToOrder(product, order_id)
-                    operateProductOrder(product)
+                    add_product_to_order(product, order_id, cur, con)
+                    operate_product_order(product, cur, con)
                 for system in orderItem.systems:
-                    addSystemToOrder(system, order_id)
-                    operateSystemOrder(system)
+                    add_system_to_order(system, order_id, cur, con)
+                    operate_system_order(system, cur, con)
+                handle_stock_status_notification(cur, con)
                 return HTTPException(
                     status_code=200, detail='Order is successfully added and handled.')
             else:
@@ -194,45 +213,3 @@ def make_new_order(orderItem: Order):
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. make_new_order')
-
-
-def operateProductOrder(product):
-    cur.execute(f"""
-        UPDATE Stock
-        SET remaining_amount = remaining_amount - {product.amount}
-        WHERE product_id = {product.id};
-    """)
-    con.commit()
-
-
-def operateSystemOrder(system):
-    cur.execute(f"""
-            SELECT * FROM System 
-            INNER JOIN Product ON Product.id = System.product_id
-            WHERE system_id = {system.id};
-        """)
-    res = cur.fetchall()
-
-    for system_item in res:
-        cur.execute(f"""
-            UPDATE Stock
-            SET remaining_amount = remaining_amount - {system_item[3] * system.amount}
-            WHERE product_id = {system_item[2]};
-        """)
-        con.commit()
-
-
-def addProductToOrder(product, order_id):
-    cur.execute(f"""
-            INSERT INTO CustomerOrder (order_id, product_id, product_amount)
-            VALUES(%s,%s,%s);
-        """, (order_id, product.id, product.amount))
-    con.commit()
-
-
-def addSystemToOrder(system, order_id):
-    cur.execute(f"""
-            INSERT INTO CustomerOrder (order_id, system_id, system_amount)
-            VALUES(%s,%s,%s);
-        """, (order_id, system.id, system.amount))
-    con.commit()

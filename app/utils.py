@@ -6,7 +6,7 @@ def get_current_ms_time():
     return round(time.time() * 1000)
 
 
-def getSystemsJson(response):
+def get_systems_json(response):
     list = {}
     for system in response:
         if system[1] not in list:
@@ -19,19 +19,20 @@ def getSystemsJson(response):
     return list
 
 
-def getStockJson(response):
+def get_stock_json(response):
     list = {}
     for stock_item in response:
         list[stock_item[0]] = {
             'product_id': stock_item[1],
-            'product_name': stock_item[5],
+            'product_name': stock_item[6],
             'remaining_amount': stock_item[2],
             'total_amount': stock_item[3],
+            'low_stock_reported': stock_item[4],
         }
     return list
 
 
-def getProductsJson(response):
+def get_products_json(response):
     list = {}
     for product in response:
         list[product[0]] = {

@@ -12,6 +12,7 @@ services:
       - POSTGRES_DB=solar_db
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
+      - MAILGUN_API_KEY=9e018b1e81a4544227429a66484b8d11-ee16bf1a-c96da913
     depends_on:
       - postgres
   postgres:

@@ -6,12 +6,12 @@
 
 **Tasks**
 
-- check availability amount on order validation
-- email functionality
 - tests
 
 **DONE**
 
+- email functionality
+- check availability amount on order validation
 - handle new order with system
 - handle new product with random set of products
 - create order model

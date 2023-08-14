@@ -25,6 +25,10 @@ class SystemProductList(BaseModel):
     system: List[SystemProduct]
 
 
+class Email(BaseModel):
+    email: str
+
+
 class ProductStockUpdate(BaseModel):
     remaining_amount: int
     total_amount: int

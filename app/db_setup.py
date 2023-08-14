@@ -34,7 +34,14 @@ def build_tables(cur):
           product_id BIGINT NOT NULL,
           remaining_amount BIGINT NOT NULL,
           total_amount INT NOT NULL,
+          low_stock_reported BOOLEAN NOT NULL, 
           FOREIGN KEY (product_id) REFERENCES Product (id));
+        """)
+
+    cur.execute(
+        """CREATE TABLE IF NOT EXISTS Email(
+          id SERIAL PRIMARY KEY NOT NULL,
+          email VARCHAR NOT NULL UNIQUE);
         """)
 
 
