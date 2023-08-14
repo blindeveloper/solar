@@ -22,6 +22,18 @@ def getSystemsJson(response):
     return list
 
 
+def getStockJson(response):
+    list = {}
+    for stock_item in response:
+        list[stock_item[0]] = {
+            'product_id': stock_item[1],
+            'product_name': stock_item[5],
+            'remaining_amount': stock_item[2],
+            'total_amount': stock_item[3],
+        }
+    return list
+
+
 def getProductsJson(response):
     list = {}
     for product in response:

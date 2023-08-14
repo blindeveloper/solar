@@ -4,7 +4,6 @@ from typing import List
 
 class Product(BaseModel):
     name: str
-    amount: int
 
 
 class SystemProduct(BaseModel):
@@ -26,5 +25,6 @@ class SystemProductList(BaseModel):
     system: List[SystemProduct]
 
 
-class ProductAmountUpdate(BaseModel):
-    amount: int
+class ProductStockUpdate(BaseModel):
+    remaining_amount: int
+    total_amount: int

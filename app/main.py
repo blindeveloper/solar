@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
-from app.entities import Product, ProductAmountUpdate, SystemProductList, Order
+from app.entities import Product, ProductStockUpdate, SystemProductList, Order
 from app.db_setup import build_tables, get_db_connection
-from app.utils import get_current_ms_time, getSystemsJson, getProductsJson, is_valid_products, is_valid_systems
+from app.utils import get_current_ms_time, getSystemsJson, getProductsJson, is_valid_products, is_valid_systems, getStockJson
 
 con = get_db_connection()
 cur = con.cursor()
@@ -10,18 +10,32 @@ app = FastAPI()
 
 
 @app.get('/product')
-def get_all_products_from_db():
+def get_all_products():
     try:
         cur.execute("SELECT * FROM Product;")
         result = cur.fetchall()
         return getProductsJson(result)
     except:
         raise HTTPException(
-            status_code=500, detail='Internal server error. get_all_products_from_db')
+            status_code=500, detail='Internal server error. get_all_products')
+
+
+@app.get('/stock')
+def get_stock_status():
+    try:
+        cur.execute(
+            """SELECT * FROM Stock 
+                INNER JOIN Product ON Product.id = Stock.product_id;""")
+        result = cur.fetchall()
+        return getStockJson(result)
+
+    except:
+        raise HTTPException(
+            status_code=500, detail='Internal server error. get_all_products')
 
 
 @app.get('/system')
-def get_all_systems_from_db():
+def get_all_systems():
     try:
         cur.execute("""
                 SELECT * FROM System 
@@ -31,36 +45,50 @@ def get_all_systems_from_db():
         return getSystemsJson(response)
     except:
         raise HTTPException(
-            status_code=500, detail='Internal server error. get_all_systems_from_db')
+            status_code=500, detail='Internal server error. get_all_systems')
 
 
-@app.put('/product/{product_id}')
-def update_product_amount(product_id: str, product: ProductAmountUpdate):
+@app.put('/stock/{product_id}')
+def update_product_stock(product_id: str, product: ProductStockUpdate):
     try:
         cur.execute(f"""
-                UPDATE Product
-                SET amount = {product.amount}
-                WHERE id = {product_id};
+                UPDATE Stock
+                SET remaining_amount = {product.remaining_amount}, total_amount = {product.total_amount}
+                WHERE product_id = {product_id};
             """)
         con.commit()
         return HTTPException(
             status_code=200, detail='Product stock was successfully updated')
     except:
         raise HTTPException(
-            status_code=500, detail='Internal server error. update_product_amount')
+            status_code=500, detail='Internal server error. update_product_stock')
+
+
+def is_product_in_db(product_name):
+    cur.execute(f"SELECT * FROM Product WHERE name = '{product_name}';")
+    if cur.fetchone() is None:
+        return False
+    else:
+        return True
 
 
 @app.post('/product')
 def add_new_product(product: Product):
     try:
-        # TODO check is product with same name is already in DB
-        cur.execute(f"""
-                    INSERT INTO Product (name, amount)
-                    VALUES(%s,%s);
-                """, (product.name, product.amount))
-        con.commit()
-        return HTTPException(
-            status_code=200, detail='New product successfully added')
+        if is_product_in_db(product.name):
+            return HTTPException(
+                status_code=500, detail='Product with the same name is already in the database, you can find it in stock.')
+        else:
+            cur.execute(f"""INSERT INTO Product (name)
+                            VALUES(%s) RETURNING id;
+                        """, (product.name,))
+            created_product = cur.fetchone()
+
+            cur.execute(
+                f"""INSERT INTO Stock (product_id, remaining_amount, total_amount) 
+                        VALUES(%s, %s, %s);""", (created_product[0], 0, 0))
+            return HTTPException(
+                status_code=200, detail='New product successfully added')
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. add_new_product')
@@ -114,9 +142,9 @@ def make_new_order(orderItem: Order):
 
 def operateProductOrder(product):
     cur.execute(f"""
-        UPDATE Product
-        SET amount = amount - {product.amount}
-        WHERE id = {product.id};
+        UPDATE Stock
+        SET remaining_amount = remaining_amount - {product.amount}
+        WHERE product_id = {product.id};
     """)
     con.commit()
 
@@ -127,14 +155,15 @@ def operateSystemOrder(system):
             INNER JOIN Product ON Product.id = System.product_id
             WHERE system_id = {system.id};
         """)
-    res = cur.fetchone()
+    res = cur.fetchall()
 
-    cur.execute(f"""
-        UPDATE Product
-        SET amount = amount - {res[3] * system.amount}
-        WHERE id = {res[2]};
-    """)
-    con.commit()
+    for system_item in res:
+        cur.execute(f"""
+            UPDATE Stock
+            SET remaining_amount = remaining_amount - {system_item[3] * system.amount}
+            WHERE product_id = {system_item[2]};
+        """)
+        con.commit()
 
 
 def addProductToOrder(product, order_id):
