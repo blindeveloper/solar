@@ -2,7 +2,7 @@
 
 1. run `docker-compose build --no-cache`
 2. run `docker-compose up`
-3. go to `http://0.0.0.0:8000/docs` to test API
+3. go to `http://0.0.0.0:8000/docs` to test API. Testing API with this web page docs is super handy.
 
 **Description**
 I've decided do go with Python on backend because of use of the fasApi library.
@@ -112,5 +112,3 @@ curl -X 'POST' \
 8. Check storage again, you will see that it's changed because of previous order.
 
 Unfortunately don't have time anymore for tests and file separation.
-
-**API explanation**
