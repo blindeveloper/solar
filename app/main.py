@@ -68,14 +68,6 @@ def update_product_stock(product_id: str, product: ProductStockUpdate):
             status_code=500, detail='Internal server error. update_product_stock')
 
 
-def is_product_in_db(product_name):
-    cur.execute(f"SELECT * FROM Product WHERE name = '{product_name}';")
-    if cur.fetchone() is None:
-        return False
-    else:
-        return True
-
-
 @app.post('/product')
 def add_new_product(product: Product):
     try:
@@ -97,16 +89,6 @@ def add_new_product(product: Product):
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. add_new_product')
-
-
-def add_products_to_system(system):
-    next_id = get_current_ms_time()
-    for product_item in system:
-        cur.execute(f"""
-            INSERT INTO System (system_id, product_id, amount)
-            VALUES(%s,%s,%s);
-        """, (next_id, product_item.id, product_item.amount))
-        con.commit()
 
 
 @app.post('/system')
@@ -135,6 +117,32 @@ def add_new_email(emailItem: Email):
     except:
         raise HTTPException(
             status_code=500, detail='Internal server error. Email already in DB.')
+
+
+@app.post('/order')
+def make_new_order(orderItem: Order):
+    try:
+        if is_valid_products(orderItem.products, cur) and is_valid_systems(orderItem.systems, cur):
+            if is_valid_products_amounts_requested(orderItem):
+                order_id = get_current_ms_time()
+                for product in orderItem.products:
+                    add_product_to_order(product, order_id, cur, con)
+                    operate_product_order(product, cur, con)
+                for system in orderItem.systems:
+                    add_system_to_order(system, order_id, cur, con)
+                    operate_system_order(system, cur, con)
+                handle_stock_status_notification(cur, con)
+                return HTTPException(
+                    status_code=200, detail='Order is successfully added and handled.')
+            else:
+                return HTTPException(
+                    status_code=500, detail='Order is not valid. To many products requested.')
+        else:
+            return HTTPException(
+                status_code=500, detail='Order is not valid. Check IDs of products and systems.')
+    except:
+        raise HTTPException(
+            status_code=500, detail='Internal server error. make_new_order')
 
 
 def get_systems_by_id(system_id):
@@ -189,27 +197,19 @@ def is_valid_products_amounts_requested(orderItem):
     return is_valid
 
 
-@app.post('/order')
-def make_new_order(orderItem: Order):
-    try:
-        if is_valid_products(orderItem.products, cur) and is_valid_systems(orderItem.systems, cur):
-            if is_valid_products_amounts_requested(orderItem):
-                order_id = get_current_ms_time()
-                for product in orderItem.products:
-                    add_product_to_order(product, order_id, cur, con)
-                    operate_product_order(product, cur, con)
-                for system in orderItem.systems:
-                    add_system_to_order(system, order_id, cur, con)
-                    operate_system_order(system, cur, con)
-                handle_stock_status_notification(cur, con)
-                return HTTPException(
-                    status_code=200, detail='Order is successfully added and handled.')
-            else:
-                return HTTPException(
-                    status_code=500, detail='Order is not valid. To many products requested.')
-        else:
-            return HTTPException(
-                status_code=500, detail='Order is not valid. Check IDs of products and systems.')
-    except:
-        raise HTTPException(
-            status_code=500, detail='Internal server error. make_new_order')
+def is_product_in_db(product_name):
+    cur.execute(f"SELECT * FROM Product WHERE name = '{product_name}';")
+    if cur.fetchone() is None:
+        return False
+    else:
+        return True
+
+
+def add_products_to_system(system):
+    next_id = get_current_ms_time()
+    for product_item in system:
+        cur.execute(f"""
+            INSERT INTO System (system_id, product_id, amount)
+            VALUES(%s,%s,%s);
+        """, (next_id, product_item.id, product_item.amount))
+        con.commit()
