@@ -110,5 +110,4 @@ curl -X 'POST' \
 ```
 
 8. Check storage again, you will see that it's changed because of previous order.
-
-Unfortunately don't have time anymore for tests and file separation.
+9. tests TBD
